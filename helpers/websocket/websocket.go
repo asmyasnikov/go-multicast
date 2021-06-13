@@ -22,6 +22,7 @@ const (
 	_MAX_DELAY = time.Second
 )
 
+// Add helps to add websocket connection into multicast communicator
 func Add(
 	m *multicast.Multicast,
 	conn *websocket.Conn,

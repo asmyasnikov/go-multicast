@@ -112,61 +112,48 @@ func (c *client) writeLoop(
 		delay = d
 		if d != 0 {
 			next = time.Now().Add(d)
+		} else {
+			next = time.Now().Add(time.Minute)
 		}
 	}
 	for {
-		if delay == 0 {
-			select {
-			case <-c.done:
+		select {
+		case <-c.done:
+			return
+		case d, ok := <-c.delayChan:
+			if !ok {
 				return
-			case d, ok := <-c.delayChan:
-				if !ok {
-					return
-				}
-				update(d)
-			case msg, ok := <-c.send:
-				if !ok {
-					return
-				}
-				if msg == nil {
-					continue
-				}
-				select {
-				case <-c.done:
-					return
-				default:
-					write(msg)
-					accumulated = nil
-				}
 			}
-		} else {
+			update(d)
+		case msg, ok := <-c.send:
+			if !ok {
+				return
+			}
+			if msg == nil {
+				continue
+			}
+			if delay == 0 {
+				write(msg)
+				accumulated = nil
+			} else {
+				accumulated = merge(accumulated, msg)
+			}
+		case <-time.After(time.Until(next)):
 			select {
 			case <-c.done:
 				return
-			case d, ok := <-c.delayChan:
-				if !ok {
-					return
-				}
-				update(d)
-			case msg, ok := <-c.send:
-				if !ok {
-					return
-				}
-				accumulated = merge(accumulated, msg)
-			case <-time.After(time.Until(next)):
-				select {
-				case <-c.done:
-					return
-				default:
+			default:
+				if accumulated != nil {
 					write(accumulated)
 					accumulated = nil
-					update(delay)
 				}
+				update(delay)
 			}
 		}
 	}
 }
 
+// Json is a wrapper under json marshalling with some checks
 func Json(data interface{}) ([]byte, error) {
 	if result, ok := data.([]byte); ok {
 		return result, nil
