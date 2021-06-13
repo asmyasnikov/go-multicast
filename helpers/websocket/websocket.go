@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	// Upgrader is a helper for upgrade http connection to websocket connection
 	Upgrader = websocket.Upgrader{
 		ReadBufferSize:  128,
 		WriteBufferSize: 128,

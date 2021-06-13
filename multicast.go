@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// Multicast is a main communicator for linking sender and receivers
 type Multicast struct {
 	mtx          sync.RWMutex
 	snapshot     interface{}
@@ -18,7 +19,7 @@ type Multicast struct {
 	defaultDelay time.Duration
 }
 
-// Creates new Multicast with empty connections and channels
+// New creates new Multicast with empty clients
 func New(
 	ctx context.Context,
 	onError func(error),
@@ -51,11 +52,12 @@ func New(
 	return m
 }
 
+// Add appends some client to multicast
 func (m *Multicast) Add(
 	read func() (msg interface{}, err error),
 	write func(msg interface{}) (err error),
 	onDone func(),
-) (received <-chan interface{}, done chan <- struct{}) {
+) (received <-chan interface{}, done chan<- struct{}) {
 	return m.add(
 		read,
 		write,
@@ -67,7 +69,7 @@ func (m *Multicast) add(
 	read func() (msg interface{}, err error),
 	write func(msg interface{}) (err error),
 	onDone func(),
-) (received <-chan interface{}, done chan <- struct{}) {
+) (received <-chan interface{}, done chan<- struct{}) {
 	c := newClient(
 		read,
 		write,
@@ -94,9 +96,10 @@ func (m *Multicast) add(
 	return c.received, c.done
 }
 
-func (m *Multicast) SendAll(data interface{}) error {
-	if reflect.ValueOf(data).Type().Kind() != reflect.Ptr {
-		panic("expected only pointer to data")
+// SendAll provide sending message to multiple clients
+func (m *Multicast) SendAll(msg interface{}) error {
+	if reflect.ValueOf(msg).Type().Kind() != reflect.Ptr {
+		panic("expected only pointer to msg")
 	}
 	m.mtx.RLock()
 	defer m.mtx.RUnlock()
@@ -105,9 +108,9 @@ func (m *Multicast) SendAll(data interface{}) error {
 		case _ = <-c.done:
 			delete(m.clients, c)
 		default:
-			c.send <- data
+			c.send <- msg
 		}
 	}
-	m.snapshot = m.merge(m.snapshot, data)
+	m.snapshot = m.merge(m.snapshot, msg)
 	return nil
 }

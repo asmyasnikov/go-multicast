@@ -54,109 +54,117 @@ func newClient(
 		w(snapshot)
 	}
 	if read != nil {
-		go func() {
-			defer c.close()
-			for {
+		go c.readLoop(read, onError)
+	}
+	go c.writeLoop(w, merge, delay)
+	return c
+}
+
+func (c *client) readLoop(
+	read func() (msg interface{}, err error),
+	onError func(err error),
+) {
+	defer c.close()
+	for {
+		select {
+		case <-c.done:
+			return
+		default:
+			msg, err := read()
+			if err != nil {
+				if onError != nil {
+					onError(err)
+				}
+				return
+			}
+			if msg == nil {
+				continue
+			}
+			select {
+			case <-c.done:
+				return
+			default:
+				switch t := msg.(type) {
+				case ChangeIntervalMessage:
+					if t.Error != nil {
+						if onError != nil {
+							onError(t.Error)
+						}
+					} else {
+						c.delayChan <- t.Interval
+					}
+				default:
+					c.received <- msg
+				}
+			}
+		}
+	}
+}
+
+func (c *client) writeLoop(
+	write func(msg interface{}),
+	merge func(source interface{}, diff interface{}) (merged interface{}),
+	delay time.Duration,
+) {
+	var accumulated interface{}
+	var next time.Time
+	update := func(d time.Duration) {
+		delay = d
+		if d != 0 {
+			next = time.Now().Add(d)
+		}
+	}
+	for {
+		if delay == 0 {
+			select {
+			case <-c.done:
+				return
+			case d, ok := <-c.delayChan:
+				if !ok {
+					return
+				}
+				update(d)
+			case msg, ok := <-c.send:
+				if !ok {
+					return
+				}
+				if msg == nil {
+					continue
+				}
 				select {
 				case <-c.done:
 					return
 				default:
-					msg, err := read()
-					if err != nil {
-						if onError != nil {
-							onError(err)
-						}
-						return
-					}
-					if msg == nil {
-						continue
-					}
-					select {
-					case <-c.done:
-						return
-					default:
-						switch t := msg.(type) {
-						case ChangeIntervalMessage:
-							if t.Error != nil {
-								if onError != nil {
-									onError(t.Error)
-								}
-							} else {
-								c.delayChan <- t.Interval
-							}
-						default:
-							c.received <- msg
-						}
-					}
+					write(msg)
+					accumulated = nil
 				}
 			}
-		}()
-	} else {
-		// Client will close only on external call c.close()
+		} else {
+			select {
+			case <-c.done:
+				return
+			case d, ok := <-c.delayChan:
+				if !ok {
+					return
+				}
+				update(d)
+			case msg, ok := <-c.send:
+				if !ok {
+					return
+				}
+				accumulated = merge(accumulated, msg)
+			case <-time.After(time.Until(next)):
+				select {
+				case <-c.done:
+					return
+				default:
+					write(accumulated)
+					accumulated = nil
+					update(delay)
+				}
+			}
+		}
 	}
-	// read messages for send and accumulate it or write switch for no-delay or delay cases
-	go func() {
-		var accumulated interface{}
-		var next time.Time
-		update := func(d time.Duration) {
-			delay = d
-			if d != 0 {
-				next = time.Now().Add(d)
-			}
-		}
-		for {
-			if delay == 0 {
-				select {
-				case <-c.done:
-					return
-				case d, ok := <-c.delayChan:
-					if !ok {
-						return
-					}
-					update(d)
-				case msg, ok := <-c.send:
-					if !ok {
-						return
-					}
-					if msg == nil {
-						continue
-					}
-					select {
-					case <-c.done:
-						return
-					default:
-						w(msg)
-						accumulated = nil
-					}
-				}
-			} else {
-				select {
-				case <-c.done:
-					return
-				case d, ok := <-c.delayChan:
-					if !ok {
-						return
-					}
-					update(d)
-				case msg, ok := <-c.send:
-					if !ok {
-						return
-					}
-					accumulated = merge(accumulated, msg)
-				case <-time.After(time.Until(next)):
-					select {
-					case <-c.done:
-						return
-					default:
-						w(accumulated)
-						accumulated = nil
-						update(delay)
-					}
-				}
-			}
-		}
-	}()
-	return c
 }
 
 func Json(data interface{}) ([]byte, error) {
