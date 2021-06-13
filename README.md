@@ -1,4 +1,5 @@
 # go-multicast
+
 [<img src="https://api.travis-ci.org/asmyasnikov/go-multicast.svg?branch=master">](https://travis-ci.org/github/asmyasnikov/go-multicast)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/asmyasnikov/go-multicast)](https://pkg.go.dev/github.com/asmyasnikov/go-multicast)
 [![GoDoc](https://godoc.org/github.com/asmyasnikov/go-multicast?status.svg)](https://godoc.org/github.com/asmyasnikov/go-multicast)
@@ -46,7 +47,11 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		m.Add(conn)
+		websocket.Add(
+			m,
+			conn,
+			nil,
+		)
 	})
 	if err := http.ListenAndServe(":80", nil); err != nil {
 		fmt.Println(err)
