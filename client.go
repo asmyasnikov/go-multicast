@@ -164,7 +164,6 @@ func Json(data interface{}) ([]byte, error) {
 func (c *client) close() {
 	c.closeOnce.Do(func() {
 		close(c.done)
-		close(c.send)
 		close(c.received)
 		close(c.intervalChan)
 		if c.onDone != nil {

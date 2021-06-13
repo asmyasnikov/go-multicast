@@ -86,6 +86,7 @@ func (m *Multicast) add(
 			if onDone != nil {
 				onDone()
 			}
+			close(c.send)
 		},
 		m.onError,
 		m.merge,
@@ -105,7 +106,6 @@ func (m *Multicast) SendAll(msg interface{}) error {
 	for c := range m.clients {
 		select {
 		case _ = <-c.done:
-			delete(m.clients, c)
 		default:
 			c.send <- msg
 		}

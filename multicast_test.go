@@ -70,8 +70,8 @@ func TestMulticast_SendAll(t *testing.T) {
 					defer mtx.Unlock()
 					d, ok := snapshots[i]
 					require.True(t, ok)
-					intervals := time.Since(now)/interval
-					require.GreaterOrEqual(t, int(intervals), d.count)
+					intervals := time.Since(now) / interval
+					require.GreaterOrEqual(t, int(intervals)+1, d.count)
 					require.Greater(t, len(d.idxs), 0)
 					for j, v := range d.idxs {
 						require.Equal(t, uint64(j), v)
