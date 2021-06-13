@@ -1,6 +1,7 @@
 package multicast
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/require"
@@ -34,7 +35,7 @@ func TestClientChangeIntervalMessage(t *testing.T) {
 		},
 		func(msg interface{}) error {
 			defer wg.Done()
-			b, err := Json(msg)
+			b, err := json.Marshal(msg)
 			require.NoError(t, err)
 			require.Equal(t, fmt.Sprintf("{\"I\":%d}", i), string(b))
 			i += 10

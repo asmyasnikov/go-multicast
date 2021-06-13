@@ -4,7 +4,6 @@ package multicast
 
 import (
 	"context"
-	"reflect"
 	"sync"
 	"time"
 )
@@ -97,19 +96,15 @@ func (m *Multicast) add(
 }
 
 // SendAll provide sending message to multiple clients
-func (m *Multicast) SendAll(msg interface{}) error {
-	if reflect.ValueOf(msg).Type().Kind() != reflect.Ptr {
-		panic("expected only pointer to msg")
-	}
+func (m *Multicast) SendAll(msg interface{}) {
 	m.mtx.RLock()
 	defer m.mtx.RUnlock()
 	for c := range m.clients {
 		select {
-		case _ = <-c.done:
+		case <-c.done:
 		default:
 			c.send <- msg
 		}
 	}
 	m.snapshot = m.merge(m.snapshot, msg)
-	return nil
 }

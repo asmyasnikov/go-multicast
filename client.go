@@ -1,7 +1,6 @@
 package multicast
 
 import (
-	"encoding/json"
 	"sync"
 	"time"
 )
@@ -151,14 +150,6 @@ func (c *client) writeLoop(
 			}
 		}
 	}
-}
-
-// Json is a wrapper under json marshalling with some checks
-func Json(data interface{}) ([]byte, error) {
-	if result, ok := data.([]byte); ok {
-		return result, nil
-	}
-	return json.Marshal(&data)
 }
 
 func (c *client) close() {

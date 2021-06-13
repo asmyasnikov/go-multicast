@@ -1,9 +1,11 @@
 package websocket
 
 import (
+	"encoding/json"
 	"github.com/asmyasnikov/go-multicast"
 	"github.com/gorilla/websocket"
 	"math"
+	"net/http"
 	"strconv"
 	"time"
 )
@@ -13,13 +15,16 @@ var (
 	Upgrader = websocket.Upgrader{
 		ReadBufferSize:  128,
 		WriteBufferSize: 128,
+		CheckOrigin: func(_ *http.Request) bool {
+			return true
+		},
 	}
 )
 
 const (
-	_SET_DELAY = "_DELAY="
-	_MIN_DELAY = time.Duration(0)
-	_MAX_DELAY = time.Second
+	setDelay = "_DELAY="
+	minDelay = time.Duration(0)
+	maxDelay = time.Second
 )
 
 // Add helps to add websocket connection into multicast communicator
@@ -37,18 +42,18 @@ func Add(
 			if len(data) == 0 {
 				return nil, nil
 			}
-			if len(data) > len(_SET_DELAY) && string(data[:len(_SET_DELAY)]) == _SET_DELAY {
-				v, err := strconv.ParseFloat(string(data[len(_SET_DELAY):]), 64)
+			if len(data) > len(setDelay) && string(data[:len(setDelay)]) == setDelay {
+				v, err := strconv.ParseFloat(string(data[len(setDelay):]), 64)
 				if err != nil {
 					return multicast.ChangeIntervalMessage{Error: err}, nil
 				}
 				d := time.Duration(v) * time.Millisecond
-				if d > _MAX_DELAY || d < _MIN_DELAY {
+				if d > maxDelay || d < minDelay {
 					d = time.Duration(
 						math.Min(
-							float64(_MAX_DELAY.Milliseconds()),
+							float64(maxDelay.Milliseconds()),
 							math.Max(
-								float64(_MIN_DELAY.Milliseconds()),
+								float64(minDelay.Milliseconds()),
 								float64(d.Milliseconds()),
 							),
 						),
@@ -59,7 +64,7 @@ func Add(
 			return unmarshall(data)
 		},
 		func(msg interface{}) error {
-			b, err := multicast.Json(msg)
+			b, err := json.Marshal(msg)
 			if err != nil {
 				return err
 			}

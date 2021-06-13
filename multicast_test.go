@@ -23,11 +23,11 @@ func TestMulticast_SendAll(t *testing.T) {
 		nil,
 		func(source interface{}, diff interface{}) (merged interface{}) {
 			if source == nil {
-				source = &msg{idxs: []uint64{}}
+				source = msg{idxs: []uint64{}}
 			}
-			_source := source.(*msg)
-			_diff := diff.(*msg)
-			return &msg{
+			_source := source.(msg)
+			_diff := diff.(msg)
+			return msg{
 				idxs: append(_source.idxs, _diff.idx),
 			}
 		},
@@ -61,7 +61,7 @@ func TestMulticast_SendAll(t *testing.T) {
 						}
 					}
 					snapshots[i].count++
-					snapshots[i].idxs = append(snapshots[i].idxs, m.(*msg).idxs...)
+					snapshots[i].idxs = append(snapshots[i].idxs, m.(msg).idxs...)
 					return nil
 				},
 				func() {
@@ -82,7 +82,7 @@ func TestMulticast_SendAll(t *testing.T) {
 	}
 	deadline := time.Now().Add(limit)
 	for i := uint64(0); time.Until(deadline) > 0; i++ {
-		m.SendAll(&msg{idx: i})
+		m.SendAll(msg{idx: i})
 		time.Sleep(time.Millisecond * 10)
 	}
 	wg.Wait()
