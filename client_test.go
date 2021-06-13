@@ -9,11 +9,10 @@ import (
 	"time"
 )
 
-type msg struct {
-	I int
-}
-
-func TestClient_processManageFlags(t *testing.T) {
+func TestClientChangeIntervalMessage(t *testing.T) {
+	type msg struct {
+		I int
+	}
 	delay := time.Millisecond * 10
 	wg := sync.WaitGroup{}
 	wg.Add(10)

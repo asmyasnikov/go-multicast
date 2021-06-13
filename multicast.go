@@ -11,12 +11,12 @@ import (
 
 // Multicast is a main communicator for linking sender and receivers
 type Multicast struct {
-	mtx          sync.RWMutex
-	snapshot     interface{}
-	clients      map[*client]struct{}
-	merge        func(source interface{}, diff interface{}) (merged interface{})
-	onError      func(error)
-	defaultDelay time.Duration
+	mtx             sync.RWMutex
+	snapshot        interface{}
+	clients         map[*client]struct{}
+	merge           func(source interface{}, diff interface{}) (merged interface{})
+	onError         func(error)
+	defaultInterval time.Duration
 }
 
 // New creates new Multicast with empty clients
@@ -24,30 +24,31 @@ func New(
 	ctx context.Context,
 	onError func(error),
 	merge func(source interface{}, diff interface{}) (merged interface{}),
-	defaultDelay time.Duration,
+	initInterval time.Duration,
 ) *Multicast {
 	m := &Multicast{
 		clients: make(map[*client]struct{}),
-		merge: func(source interface{}, diff interface{}) (merged interface{}) {
-			if source == nil || merge == nil {
-				return diff
-			}
-			return merge(source, diff)
-		},
+		merge:   merge,
 		onError: func(err error) {
 			if onError != nil {
 				onError(err)
 			}
 		},
-		defaultDelay: defaultDelay,
+		defaultInterval: initInterval,
 	}
 	go func() {
 		<-ctx.Done()
 		m.mtx.RLock()
-		defer m.mtx.RUnlock()
+		wg := sync.WaitGroup{}
 		for c := range m.clients {
-			c.close()
+			wg.Add(1)
+			go func(c *client) {
+				defer wg.Done()
+				c.close()
+			}(c)
 		}
+		m.mtx.RUnlock()
+		wg.Wait()
 	}()
 	return m
 }
@@ -70,12 +71,12 @@ func (m *Multicast) add(
 	write func(msg interface{}) (err error),
 	onDone func(),
 ) (received <-chan interface{}, done chan<- struct{}) {
+	m.mtx.Lock()
+	defer m.mtx.Unlock()
 	c := newClient(
 		read,
 		write,
 		func() interface{} {
-			m.mtx.RLock()
-			defer m.mtx.RUnlock()
 			return m.snapshot
 		}(),
 		func(c *client) {
@@ -88,11 +89,9 @@ func (m *Multicast) add(
 		},
 		m.onError,
 		m.merge,
-		m.defaultDelay,
+		m.defaultInterval,
 	)
-	m.mtx.Lock()
 	m.clients[c] = struct{}{}
-	m.mtx.Unlock()
 	return c.received, c.done
 }
 

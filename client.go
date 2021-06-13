@@ -14,7 +14,7 @@ type client struct {
 	send     chan interface{}
 	received chan interface{}
 
-	delayChan chan time.Duration
+	intervalChan chan time.Duration
 }
 
 func newClient(
@@ -24,13 +24,13 @@ func newClient(
 	onDone func(c *client),
 	onError func(err error),
 	merge func(source interface{}, diff interface{}) (merged interface{}),
-	delay time.Duration,
+	interval time.Duration,
 ) *client {
 	c := &client{
-		done:      make(chan struct{}),
-		send:      make(chan interface{}, 20),
-		received:  make(chan interface{}, 20),
-		delayChan: make(chan time.Duration),
+		done:         make(chan struct{}),
+		send:         make(chan interface{}, 20),
+		received:     make(chan interface{}, 20),
+		intervalChan: make(chan time.Duration),
 	}
 	if onDone != nil {
 		c.onDone = func() {
@@ -56,7 +56,7 @@ func newClient(
 	if read != nil {
 		go c.readLoop(read, onError)
 	}
-	go c.writeLoop(w, merge, delay)
+	go c.writeLoop(w, merge, interval)
 	return c
 }
 
@@ -91,7 +91,7 @@ func (c *client) readLoop(
 							onError(t.Error)
 						}
 					} else {
-						c.delayChan <- t.Interval
+						c.intervalChan <- t.Interval
 					}
 				default:
 					c.received <- msg
@@ -113,14 +113,14 @@ func (c *client) writeLoop(
 		if d != 0 {
 			next = time.Now().Add(d)
 		} else {
-			next = time.Now().Add(time.Minute)
+			next = time.Now().Add(time.Hour * 24)
 		}
 	}
 	for {
 		select {
 		case <-c.done:
 			return
-		case d, ok := <-c.delayChan:
+		case d, ok := <-c.intervalChan:
 			if !ok {
 				return
 			}
@@ -163,12 +163,12 @@ func Json(data interface{}) ([]byte, error) {
 
 func (c *client) close() {
 	c.closeOnce.Do(func() {
-		if c.onDone != nil {
-			c.onDone()
-		}
 		close(c.done)
 		close(c.send)
 		close(c.received)
-		close(c.delayChan)
+		close(c.intervalChan)
+		if c.onDone != nil {
+			c.onDone()
+		}
 	})
 }
